@@ -93,6 +93,10 @@ public class Router {
         }
 
         String path = request.getPath();
+        // 确保路径以 "/" 开头，兼容不同的请求解析结果
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
 
         for (RouteDefinition route : routes) {
             if (pathMatcher.match(route.getPathPattern(), path)) {
@@ -124,8 +128,11 @@ public class Router {
             return null;
         }
 
-        // 处理路径
+        // 处理路径 - 先确保路径以 "/" 开头，再进行前缀剥离
         String path = request.getPath();
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
         if (route.isStripPrefix()) {
             path = stripPrefix(path, route.getPathPattern());
         }

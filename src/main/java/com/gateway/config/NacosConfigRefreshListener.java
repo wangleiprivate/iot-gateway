@@ -8,7 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.environment.EnvironmentChangeEvent;
+import org.springframework.cloud.context.properties.ConfigurationPropertiesRebinder;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -114,9 +117,14 @@ public class NacosConfigRefreshListener {
      * 当 Nacos 配置变更时，Spring Cloud Nacos Config 会自动更新 Environment
      * 并发布 EnvironmentChangeEvent 事件
      *
+     * 使用 @Order 确保在 ConfigurationPropertiesRebinder 之后执行
+     * ConfigurationPropertiesRebinder 使用 Ordered.LOWEST_PRECEDENCE - 100
+     * 我们使用 Ordered.LOWEST_PRECEDENCE 确保 GatewayProperties 已被重新绑定
+     *
      * @param event 环境变更事件
      */
     @EventListener
+    @Order(Ordered.LOWEST_PRECEDENCE)
     public void onEnvironmentChange(EnvironmentChangeEvent event) {
         Set<String> changedKeys = event.getKeys();
 

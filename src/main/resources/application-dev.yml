@@ -14,11 +14,15 @@ gateway:
         - 10.0.0.0/8
         - 172.16.0.0/12
         - 192.168.0.0/16
-        - 61.134.69.50
     auth:
-      enabled: false  # Disabled in dev for easier testing
+      enabled: true
       skip-paths:
-        - /**
+        - /public/**
+        - /health
+        - /actuator/**
+        - /favicon.ico
+      auth-server-url: https://auth.example.com/validate
+      timeout-ms: 500
 
   rate-limit:
     enabled: true
@@ -32,15 +36,24 @@ gateway:
     wait-duration-open-state-seconds: 10
 
   routes:
-    - id: select-all-device-water-group
-      path-pattern: /api/liancheng/select-all-device-water-group
+    - id: liancheng-route
+      path-pattern: /api/liancheng/**
       targets:
-        - http://61.134.69.50:8768/operationplatformmgn/o/saas/device-water-group/select-all-device-water-group?deviceId=749227479138304
-      strip-prefix: false
+        - http://61.134.69.50:8768/
+      strip-prefix: true
       require-auth: false
       header-transforms:
-        X-Gateway: claude-gateway-dev
-        X-Environment: development
+        X-Gateway: iot-gateway-dev
+
+
+    - id: iot-route
+      path-pattern: /api/yt/**
+      targets:
+        - http://61.134.69.91:9528/api/yt/
+      strip-prefix: true
+      require-auth: false
+      header-transforms:
+        X-Gateway: iot-gateway-dev
 
 logging:
   level:

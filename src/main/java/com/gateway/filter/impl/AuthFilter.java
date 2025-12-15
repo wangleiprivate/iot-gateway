@@ -22,6 +22,10 @@ import java.util.List;
  * 鉴权过滤器
  * 调用认证服务验证 Token
  *
+ * TODO: 第三方鉴权服务地址待配置
+ * 目前第三方鉴权接口地址还未确定，需要后续配置 gateway.security.auth.auth-server-url
+ * 鉴权失败时需要提示用户去指定地址进行鉴权
+ *
  * @author Claude Gateway Team
  * @version 1.0.0
  */
@@ -59,9 +63,9 @@ public class AuthFilter implements GatewayFilter {
 
     @Override
     public boolean isEnabled() {
-        return properties.getSecurity() != null
-                && properties.getSecurity().getAuth() != null
-                && properties.getSecurity().getAuth().isEnabled();
+        // 始终启用 AuthFilter，具体鉴权逻辑在 filter 方法中根据路由配置判断
+        // 这样可以支持：全局关闭鉴权但路由级别开启鉴权的场景
+        return true;
     }
 
     @Override
@@ -85,10 +89,12 @@ public class AuthFilter implements GatewayFilter {
         String token = request.getToken();
         if (token == null || token.isEmpty()) {
             log.warn("[{}] 缺少认证 Token", request.getTraceId());
-            return Mono.just(GatewayResponse.unauthorized("Missing authentication token"));
+            // TODO: 第三方鉴权服务地址待配置，需要在提示信息中告知用户去哪里鉴权
+            return Mono.just(GatewayResponse.unauthorized("Missing authentication token, please authenticate at the authentication service"));
         }
 
         // 调用认证服务验证 Token
+        // TODO: 第三方鉴权服务地址待配置，配置项：gateway.security.auth.auth-server-url
         return verifyToken(token, request.getTraceId())
                 .flatMap(valid -> {
                     if (valid) {
@@ -96,13 +102,15 @@ public class AuthFilter implements GatewayFilter {
                         return chain.filter(request);
                     } else {
                         log.warn("[{}] Token 验证失败", request.getTraceId());
-                        return Mono.just(GatewayResponse.unauthorized("Invalid authentication token"));
+                        // TODO: 需要在提示信息中告知用户去哪里鉴权，待第三方鉴权服务地址确定后更新
+                        return Mono.just(GatewayResponse.unauthorized("Invalid authentication token, please re-authenticate at the authentication service"));
                     }
                 })
                 .onErrorResume(e -> {
                     log.error("[{}] 调用认证服务失败: {}", request.getTraceId(), e.getMessage());
                     // 认证服务故障时的策略：拒绝请求
-                    return Mono.just(GatewayResponse.internalServerError("Authentication service unavailable"));
+                    // TODO: 需要在提示信息中告知用户去哪里鉴权
+                    return Mono.just(GatewayResponse.internalServerError("Authentication service unavailable, please try again later"));
                 });
     }
 
@@ -133,6 +141,12 @@ public class AuthFilter implements GatewayFilter {
 
     /**
      * 验证 Token
+     * 调用第三方鉴权服务验证 Token 有效性
+     *
+     * TODO: 第三方鉴权服务地址待配置
+     * 配置项：gateway.security.auth.auth-server-url
+     * 验证接口：{auth-server-url}/verify
+     * 请求头：Authorization: Bearer {token}
      *
      * @param token   Token
      * @param traceId 追踪 ID

@@ -12,26 +12,6 @@ gateway:
       boss-threads: 1
       worker-threads: 0  # 0 means Netty auto-calculates based on CPU cores
 
-  # Security Configuration
-  security:
-    ip-whitelist:
-      enabled: true
-      list:
-        - 127.0.0.1
-        - 0:0:0:0:0:0:0:1
-        - 10.0.0.0/8
-        - 172.16.0.0/12
-        - 192.168.0.0/16
-    auth:
-      enabled: true
-      skip-paths:
-        - /public/**
-        - /health
-        - /actuator/**
-        - /favicon.ico
-      auth-server-url: https://auth.example.com/validate
-      timeout-ms: 500
-
   # Rate Limiting Configuration
   rate-limit:
     enabled: true
