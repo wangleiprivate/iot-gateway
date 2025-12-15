@@ -1,0 +1,209 @@
+{
+  "groups": [
+    {
+      "name": "gateway",
+      "type": "com.gateway.config.GatewayProperties",
+      "sourceType": "com.gateway.config.GatewayProperties"
+    },
+    {
+      "name": "gateway.circuit-breaker",
+      "type": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "sourceType": "com.gateway.config.GatewayProperties"
+    },
+    {
+      "name": "gateway.rate-limit",
+      "type": "com.gateway.config.GatewayProperties$RateLimitProperties",
+      "sourceType": "com.gateway.config.GatewayProperties"
+    },
+    {
+      "name": "gateway.rate-limit.per-client",
+      "type": "com.gateway.config.GatewayProperties$PerClientProperties",
+      "sourceType": "com.gateway.config.GatewayProperties$RateLimitProperties"
+    },
+    {
+      "name": "gateway.security",
+      "type": "com.gateway.config.GatewayProperties$SecurityProperties",
+      "sourceType": "com.gateway.config.GatewayProperties"
+    },
+    {
+      "name": "gateway.security.auth",
+      "type": "com.gateway.config.GatewayProperties$AuthProperties",
+      "sourceType": "com.gateway.config.GatewayProperties$SecurityProperties"
+    },
+    {
+      "name": "gateway.security.ip-whitelist",
+      "type": "com.gateway.config.GatewayProperties$IpWhitelistProperties",
+      "sourceType": "com.gateway.config.GatewayProperties$SecurityProperties"
+    },
+    {
+      "name": "gateway.server",
+      "type": "com.gateway.config.GatewayProperties$ServerProperties",
+      "sourceType": "com.gateway.config.GatewayProperties"
+    },
+    {
+      "name": "gateway.server.netty",
+      "type": "com.gateway.config.GatewayProperties$NettyProperties",
+      "sourceType": "com.gateway.config.GatewayProperties$ServerProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "gateway.circuit-breaker.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用熔断",
+      "sourceType": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "gateway.circuit-breaker.failure-rate-threshold",
+      "type": "java.lang.Integer",
+      "description": "失败率阈值（百分比）",
+      "sourceType": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "defaultValue": 50
+    },
+    {
+      "name": "gateway.circuit-breaker.minimum-number-of-calls",
+      "type": "java.lang.Integer",
+      "description": "最小调用次数",
+      "sourceType": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "defaultValue": 10
+    },
+    {
+      "name": "gateway.circuit-breaker.sliding-window-size",
+      "type": "java.lang.Integer",
+      "description": "滑动窗口大小",
+      "sourceType": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "defaultValue": 20
+    },
+    {
+      "name": "gateway.circuit-breaker.slow-call-duration-threshold-ms",
+      "type": "java.lang.Integer",
+      "description": "慢调用持续时间阈值（毫秒）",
+      "sourceType": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "defaultValue": 2000
+    },
+    {
+      "name": "gateway.circuit-breaker.slow-call-rate-threshold",
+      "type": "java.lang.Integer",
+      "description": "慢调用率阈值（百分比）",
+      "sourceType": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "defaultValue": 80
+    },
+    {
+      "name": "gateway.circuit-breaker.wait-duration-open-state-seconds",
+      "type": "java.lang.Integer",
+      "description": "熔断打开状态等待时间（秒）",
+      "sourceType": "com.gateway.config.GatewayProperties$CircuitBreakerProperties",
+      "defaultValue": 30
+    },
+    {
+      "name": "gateway.rate-limit.algorithm",
+      "type": "java.lang.String",
+      "description": "限流算法：token-bucket（令牌桶）或 leaky-bucket（漏桶）",
+      "sourceType": "com.gateway.config.GatewayProperties$RateLimitProperties",
+      "defaultValue": "token-bucket"
+    },
+    {
+      "name": "gateway.rate-limit.capacity",
+      "type": "java.lang.Integer",
+      "description": "令牌桶容量",
+      "sourceType": "com.gateway.config.GatewayProperties$RateLimitProperties",
+      "defaultValue": 100
+    },
+    {
+      "name": "gateway.rate-limit.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用限流",
+      "sourceType": "com.gateway.config.GatewayProperties$RateLimitProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "gateway.rate-limit.per-client.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用按客户端限流",
+      "sourceType": "com.gateway.config.GatewayProperties$PerClientProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "gateway.rate-limit.refill-period-seconds",
+      "type": "java.lang.Integer",
+      "description": "填充周期（秒）",
+      "sourceType": "com.gateway.config.GatewayProperties$RateLimitProperties",
+      "defaultValue": 60
+    },
+    {
+      "name": "gateway.rate-limit.refill-tokens",
+      "type": "java.lang.Integer",
+      "description": "每次填充的令牌数",
+      "sourceType": "com.gateway.config.GatewayProperties$RateLimitProperties",
+      "defaultValue": 100
+    },
+    {
+      "name": "gateway.routes",
+      "type": "java.util.List<com.gateway.config.GatewayProperties$RouteProperties>",
+      "description": "路由配置列表",
+      "sourceType": "com.gateway.config.GatewayProperties"
+    },
+    {
+      "name": "gateway.security.auth.auth-server-url",
+      "type": "java.lang.String",
+      "description": "认证服务器 URL",
+      "sourceType": "com.gateway.config.GatewayProperties$AuthProperties"
+    },
+    {
+      "name": "gateway.security.auth.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用鉴权",
+      "sourceType": "com.gateway.config.GatewayProperties$AuthProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "gateway.security.auth.skip-paths",
+      "type": "java.util.List<java.lang.String>",
+      "description": "跳过鉴权的路径列表（支持 AntPath 模式）",
+      "sourceType": "com.gateway.config.GatewayProperties$AuthProperties"
+    },
+    {
+      "name": "gateway.security.auth.timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "认证超时时间（毫秒）",
+      "sourceType": "com.gateway.config.GatewayProperties$AuthProperties",
+      "defaultValue": 500
+    },
+    {
+      "name": "gateway.security.ip-whitelist.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用 IP 白名单",
+      "sourceType": "com.gateway.config.GatewayProperties$IpWhitelistProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "gateway.security.ip-whitelist.list",
+      "type": "java.util.List<java.lang.String>",
+      "description": "IP 白名单列表（支持 CIDR 格式，如 10.0.0.0\/8）",
+      "sourceType": "com.gateway.config.GatewayProperties$IpWhitelistProperties"
+    },
+    {
+      "name": "gateway.server.netty.boss-threads",
+      "type": "java.lang.Integer",
+      "description": "Boss 线程数（处理连接）",
+      "sourceType": "com.gateway.config.GatewayProperties$NettyProperties",
+      "defaultValue": 1
+    },
+    {
+      "name": "gateway.server.netty.worker-threads",
+      "type": "java.lang.Integer",
+      "description": "Worker 线程数（处理 IO），0 表示自动计算",
+      "sourceType": "com.gateway.config.GatewayProperties$NettyProperties",
+      "defaultValue": 0
+    },
+    {
+      "name": "gateway.server.port",
+      "type": "java.lang.Integer",
+      "description": "服务端口",
+      "sourceType": "com.gateway.config.GatewayProperties$ServerProperties",
+      "defaultValue": 8080
+    }
+  ],
+  "hints": []
+}

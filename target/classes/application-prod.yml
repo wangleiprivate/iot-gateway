@@ -1,0 +1,57 @@
+# Production Environment Configuration
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+gateway:
+  security:
+    ip-whitelist:
+      enabled: true
+      list:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    auth:
+      enabled: true
+      skip-paths:
+        - /public/**
+        - /health
+        - /actuator/health
+      auth-server-url: https://auth.example.com/validate
+      timeout-ms: 500
+
+  rate-limit:
+    enabled: true
+    capacity: 100
+    refill-tokens: 100
+    refill-period-seconds: 60
+    per-client:
+      enabled: true
+
+  circuit-breaker:
+    enabled: true
+    failure-rate-threshold: 50
+    wait-duration-open-state-seconds: 30
+    sliding-window-size: 20
+    slow-call-duration-threshold-ms: 2000
+    slow-call-rate-threshold: 80
+    minimum-number-of-calls: 10
+
+  routes:
+    - id: production-route
+      path-pattern: /api/**
+      targets:
+        - http://backend-service:8081
+      strip-prefix: false
+      require-auth: true
+      header-transforms:
+        X-Gateway: claude-gateway-prod
+        X-Environment: production
+
+logging:
+  level:
+    root: WARN
+    com.gateway: INFO
+    io.netty: WARN
+    reactor.netty: WARN
