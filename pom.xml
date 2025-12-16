@@ -97,6 +97,12 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-bootstrap</artifactId>
         </dependency>
+        
+        <!-- Spring Cloud LoadBalancer (解决 Spring Cloud Alibaba 2025.0.0.0 的兼容性问题) -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
 
         <!-- Resilience4j for Circuit Breaker, Rate Limiter, Retry -->
         <dependency>

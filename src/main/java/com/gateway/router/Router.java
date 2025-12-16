@@ -14,7 +14,9 @@ import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 路由器
@@ -28,6 +30,11 @@ public class Router {
 
     private static final Logger log = LoggerFactory.getLogger(Router.class);
 
+    /**
+     * 热更新状态标志，防止在热更新过程中路由匹配读取到不一致的配置
+     */
+    private final AtomicBoolean isRefreshing = new AtomicBoolean(false);
+    
     /**
      * 使用 ObjectProvider 延迟获取 GatewayProperties
      * 这样每次调用时都能获取到 ConfigurationPropertiesRebinder 刷新后的最新配置
@@ -61,7 +68,26 @@ public class Router {
      */
     @PostConstruct
     public void init() {
-        loadRoutesFromConfig();
+        // 尝试多次加载路由配置，确保 Nacos 配置已加载
+        int attempts = 0;
+        final int maxAttempts = 10;
+        while (attempts < maxAttempts) {
+            loadRoutesFromConfig();
+            if (routes.size() > 0) {
+                log.info("路由器初始化完成，共加载 {} 条路由", routes.size());
+                return;
+            }
+            
+            attempts++;
+            log.warn("第 {} 次尝试加载路由配置，未找到路由，等待后重试...", attempts);
+            try {
+                Thread.sleep(1000); // 等待1秒后重试
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        
         log.info("路由器初始化完成，共加载 {} 条路由", routes.size());
     }
 
@@ -142,16 +168,19 @@ public class Router {
 
         for (RouteDefinition route : routes) {
             if (pathMatcher.match(route.getPathPattern(), path)) {
-                // 为了确保路由配置是最新的，这里也从配置中获取最新的 requireAuth 值
-                GatewayProperties properties = getProperties();
-                if (properties != null && properties.getRoutes() != null) {
-                    Optional<GatewayProperties.RouteProperties> config = properties.getRoutes().stream()
-                        .filter(r -> r.getId().equals(route.getId()))
-                        .findFirst();
-                    
-                    if (config.isPresent()) {
-                        // 更新路由对象的 requireAuth 值，确保使用最新的配置
-                        route.setRequireAuth(config.get().isRequireAuth());
+                // 优化：只有在非热更新状态下才实时读取最新配置
+                // 避免在热更新过程中因配置不同步导致的状态不一致
+                if (!isRefreshing.get()) {
+                    GatewayProperties properties = getProperties();
+                    if (properties != null && properties.getRoutes() != null) {
+                        Optional<GatewayProperties.RouteProperties> config = properties.getRoutes().stream()
+                            .filter(r -> r.getId().equals(route.getId()))
+                            .findFirst();
+                        
+                        if (config.isPresent()) {
+                            // 更新路由对象的 requireAuth 值，确保使用最新的配置
+                            route.setRequireAuth(config.get().isRequireAuth());
+                        }
                     }
                 }
                 
@@ -253,33 +282,40 @@ public class Router {
      * 用于动态更新路由（从 Nacos 等配置中心）
      */
     public void refresh() {
-        log.info("刷新路由配置...");
-        int oldSize = routes.size();
-        
-        // 先输出当前路由状态
-        log.info("刷新前路由状态:");
-        for (RouteDefinition route : routes) {
-            log.info("  路由: id={}, requireAuth={}", route.getId(), route.isRequireAuth());
-        }
-        
-        // 获取最新的配置信息
-        GatewayProperties properties = getProperties();
-        if (properties != null && properties.getRoutes() != null) {
-            log.info("配置中的路由状态:");
-            for (GatewayProperties.RouteProperties config : properties.getRoutes()) {
-                log.info("  配置: id={}, requireAuth={}", config.getId(), config.isRequireAuth());
+        // 设置热更新状态，防止 match() 方法在刷新过程中读取不一致的配置
+        isRefreshing.set(true);
+        try {
+            log.info("刷新路由配置...");
+            int oldSize = routes.size();
+            
+            // 先输出当前路由状态
+            log.info("刷新前路由状态:");
+            for (RouteDefinition route : routes) {
+                log.info("  路由: id={}, requireAuth={}", route.getId(), route.isRequireAuth());
             }
-        }
-        
-        loadRoutesFromConfig();
-        int newSize = routes.size();
-        
-        // 输出路由变更信息，特别是 require-auth 的变更
-        log.info("路由配置刷新完成，路由数量: {} -> {}", oldSize, newSize);
-        log.info("刷新后路由状态:");
-        for (RouteDefinition route : routes) {
-            log.info("  路由: id={}, pattern={}, requireAuth={}", 
-                    route.getId(), route.getPathPattern(), route.isRequireAuth());
+            
+            // 获取最新的配置信息
+            GatewayProperties properties = getProperties();
+            if (properties != null && properties.getRoutes() != null) {
+                log.info("配置中的路由状态:");
+                for (GatewayProperties.RouteProperties config : properties.getRoutes()) {
+                    log.info("  配置: id={}, requireAuth={}", config.getId(), config.isRequireAuth());
+                }
+            }
+            
+            loadRoutesFromConfig();
+            int newSize = routes.size();
+            
+            // 输出路由变更信息，特别是 require-auth 的变更
+            log.info("路由配置刷新完成，路由数量: {} -> {}", oldSize, newSize);
+            log.info("刷新后路由状态:");
+            for (RouteDefinition route : routes) {
+                log.info("  路由: id={}, pattern={}, requireAuth={}", 
+                        route.getId(), route.getPathPattern(), route.isRequireAuth());
+            }
+        } finally {
+            // 确保热更新状态被重置，避免影响后续请求
+            isRefreshing.set(false);
         }
     }
 

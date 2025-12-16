@@ -6,10 +6,13 @@ import com.alibaba.nacos.api.exception.NacosException;
 import com.gateway.router.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.environment.EnvironmentChangeEvent;
 import org.springframework.cloud.context.properties.ConfigurationPropertiesRebinder;
 import org.springframework.cloud.context.scope.refresh.RefreshScope;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -41,6 +44,8 @@ public class NacosConfigRefreshListener {
     private final Router router;
     private final ConfigurationPropertiesRebinder configRebinder;
     private final RefreshScope refreshScope;
+    private final ObjectProvider<GatewayProperties> propertiesProvider;
+    private final ApplicationContext applicationContext;
 
     /**
      * Nacos 配置数据 ID 前缀
@@ -51,7 +56,7 @@ public class NacosConfigRefreshListener {
     /**
      * Nacos 配置组
      */
-    @Value("${spring.cloud.nacos.config.group:DEFAULT_GROUP}")
+    @Value("${spring.cloud.nacos.config.group:IOT_GROUP}")
     private String group;
 
     /**
@@ -85,12 +90,17 @@ public class NacosConfigRefreshListener {
      */
     private final AtomicBoolean refreshing = new AtomicBoolean(false);
 
+    @Autowired
     public NacosConfigRefreshListener(NacosConfigManager nacosConfigManager, Router router, 
-                                     ConfigurationPropertiesRebinder configRebinder, RefreshScope refreshScope) {
+                                     ConfigurationPropertiesRebinder configRebinder, RefreshScope refreshScope,
+                                     ObjectProvider<GatewayProperties> propertiesProvider,
+                                     ApplicationContext applicationContext) {
         this.nacosConfigManager = nacosConfigManager;
         this.router = router;
         this.configRebinder = configRebinder;
         this.refreshScope = refreshScope;
+        this.propertiesProvider = propertiesProvider;
+        this.applicationContext = applicationContext;
     }
 
     /**
@@ -108,10 +118,28 @@ public class NacosConfigRefreshListener {
             if (activeProfile != null && !activeProfile.isEmpty()) {
                 String profileDataId = prefix + "-" + activeProfile + "." + fileExtension;
                 registerListener(profileDataId);
+                
+                // 调试：启动时立即从 Nacos 拉取配置，确认客户端缓存内容
+                try {
+                    String config = nacosConfigManager.getConfigService().getConfig(profileDataId, group, 5000);
+                    log.info("启动时拉取 profile 配置内容 ({}): {}", profileDataId, config.substring(0, Math.min(500, config.length())) + (config.length() > 500 ? "..." : ""));
+                } catch (NacosException e) {
+                    log.error("启动时拉取 profile 配置失败: {}", profileDataId, e);
+                }
             }
             
             log.info("Nacos 配置监听器初始化完成，监听配置: {}, {}", baseDataId, 
                     activeProfile != null && !activeProfile.isEmpty() ? prefix + "-" + activeProfile + "." + fileExtension : "无profile配置");
+            
+            // 启动后立即尝试刷新配置以确保加载
+            try {
+                Thread.sleep(3000); // 等待 Nacos 客户端初始化
+                log.info("开始首次配置加载...");
+                doRefresh();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("配置刷新等待被中断");
+            }
         } catch (Exception e) {
             log.error("Nacos 配置监听器初始化失败", e);
         }
@@ -134,6 +162,13 @@ public class NacosConfigRefreshListener {
             @Override
             public void receiveConfigInfo(String configInfo) {
                 log.info("收到 Nacos 配置变更通知 (原生监听器): dataId={}", dataId);
+                // 调试：立即从 Nacos 拉取最新配置，确认是否真的更新
+                try {
+                    String latestConfig = nacosConfigManager.getConfigService().getConfig(dataId, group, 5000);
+                    log.info("立即拉取的最新配置内容 ({}): {}", dataId, latestConfig.substring(0, Math.min(500, latestConfig.length())) + (latestConfig.length() > 500 ? "..." : ""));
+                } catch (NacosException e) {
+                    log.error("立即拉取配置失败: {}", dataId, e);
+                }
                 log.debug("配置变更内容: {}", configInfo.substring(0, Math.min(200, configInfo.length())) + "...");
                 doRefresh();
             }
@@ -166,10 +201,11 @@ public class NacosConfigRefreshListener {
 
         if (gatewayConfigChanged) {
             log.info("检测到网关配置变更，变更的配置项: {}", changedKeys);
-            // 打印具体变更的键值对
+            // 打印具体变更的键值对 - 修复：使用Environment而不是System.getProperty
             for (String key : changedKeys) {
                 if (key.startsWith("gateway.")) {
-                    log.info("配置变更: {} -> {}", key, System.getProperty(key));
+                    String newValue = applicationContext.getEnvironment().getProperty(key);
+                    log.info("配置变更: {} -> {}", key, newValue);
                 }
             }
             doRefresh();
@@ -179,7 +215,7 @@ public class NacosConfigRefreshListener {
     /**
      * 执行配置刷新
      * 使用 CAS 操作防止并发刷新
-     * 重构：使用更可靠的方式确保配置更新
+     * 优化：减少重复刷新，确保配置完全生效后再读取
      */
     private void doRefresh() {
         if (refreshing.compareAndSet(false, true)) {
@@ -203,29 +239,15 @@ public class NacosConfigRefreshListener {
                 configRebinder.rebind("gatewayProperties");
                 log.info("GatewayProperties 配置已重新绑定");
                 
-                // 4. 等待配置完全加载
-                Thread.sleep(500);
+                // 4. 等待配置完全加载（增加等待时间确保异步绑定完成）
+                Thread.sleep(800);
                 
                 // 5. 刷新路由配置（这将重新加载 GatewayProperties 中的路由配置）
                 router.refresh();
                 log.info("路由配置刷新完成");
                 
-                // 6. 再次刷新以确保所有 Bean 都使用最新配置
-                refreshScope.refreshAll();
-                
-                // 7. 额外确保 GatewayProperties 已更新
-                configRebinder.rebind("gatewayProperties");
-                log.info("GatewayProperties 再次重新绑定");
-                
-                // 8. 再次等待确保配置完全加载
-                Thread.sleep(300);
-                
-                // 9. 再次刷新路由以确保使用最新配置
-                router.refresh();
-                
+                // 6. 输出刷新后的状态（只输出一次，避免混淆）
                 log.info("全量配置刷新完成，所有 Bean 已更新，路由 requireAuth 状态已同步");
-                
-                // 10. 输出刷新后的状态
                 log.info("刷新后路由 requireAuth 状态:");
                 GatewayProperties updatedProps = getCurrentGatewayProperties();
                 if (updatedProps != null && updatedProps.getRoutes() != null) {
@@ -237,13 +259,13 @@ public class NacosConfigRefreshListener {
             } catch (Exception e) {
                 log.error("全量配置刷新失败", e);
                 
-                // 备用刷新方案
+                // 备用刷新方案：简化版本，避免重复刷新
                 try {
                     log.warn("执行备用刷新方案...");
                     refreshScope.refreshAll();
-                    Thread.sleep(300);
+                    Thread.sleep(500);
                     configRebinder.rebind("gatewayProperties");
-                    Thread.sleep(200);
+                    Thread.sleep(300);
                     router.refresh();
                     log.info("备用刷新方案执行完成");
                 } catch (Exception ex) {
@@ -252,7 +274,7 @@ public class NacosConfigRefreshListener {
             } finally {
                 // 确保刷新标志被重置
                 try {
-                    Thread.sleep(100); // 短暂延迟确保刷新完成
+                    Thread.sleep(200); // 短暂延迟确保刷新完成
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                 }
@@ -267,7 +289,14 @@ public class NacosConfigRefreshListener {
      * 获取当前 GatewayProperties 实例，用于调试
      */
     private GatewayProperties getCurrentGatewayProperties() {
-        return GatewayProperties.class.cast(configRebinder.getBeans().get("gatewayProperties"));
+        // 由于 ConfigurationPropertiesRebinder 没有直接的 API 获取 Bean，
+        // 我们使用 ObjectProvider 来获取最新的 GatewayProperties
+        try {
+            return propertiesProvider.getIfAvailable();
+        } catch (Exception e) {
+            log.warn("无法获取 GatewayProperties 实例: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**
