@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.5</version>
+        <version>3.4.0</version> <!-- Spring Cloud 2024.0.0 对应的兼容版本 -->
         <relativePath/>
     </parent>
 
@@ -19,8 +19,8 @@
 
     <properties>
         <java.version>17</java.version>
-        <spring-cloud.version>2023.0.1</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
+        <spring-cloud.version>2024.0.0</spring-cloud.version> <!-- Spring Cloud Alibaba 2025.0.0.0 对应的版本 -->
+        <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
         <resilience4j.version>2.2.0</resilience4j.version>
         <bucket4j.version>8.7.0</bucket4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

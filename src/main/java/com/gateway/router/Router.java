@@ -49,7 +49,11 @@ public class Router {
      * 每次调用都会获取最新的配置（支持 Nacos 热更新）
      */
     private GatewayProperties getProperties() {
-        return propertiesProvider.getIfAvailable();
+        GatewayProperties properties = propertiesProvider.getIfAvailable();
+        if (properties == null) {
+            log.warn("GatewayProperties 不可用");
+        }
+        return properties;
     }
 
     /**
@@ -65,15 +69,34 @@ public class Router {
      * 从配置加载路由
      */
     private void loadRoutesFromConfig() {
-        GatewayProperties properties = getProperties();
+        // 多次尝试获取配置，确保获取到最新值
+        GatewayProperties properties = null;
+        int attempts = 0;
+        final int maxAttempts = 3;
+        
+        while (properties == null && attempts < maxAttempts) {
+            properties = getProperties();
+            if (properties == null) {
+                attempts++;
+                log.warn("第 {} 次尝试获取 GatewayProperties 失败", attempts);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        
         if (properties == null) {
-            log.warn("GatewayProperties 尚未初始化");
+            log.error("多次尝试后仍无法获取 GatewayProperties");
             return;
         }
 
         List<GatewayProperties.RouteProperties> routeConfigs = properties.getRoutes();
         if (routeConfigs == null || routeConfigs.isEmpty()) {
             log.warn("未配置任何路由");
+            routes.clear();
             return;
         }
 
@@ -84,13 +107,13 @@ public class Router {
                     .pathPattern(config.getPathPattern())
                     .targets(config.getTargets())
                     .stripPrefix(config.isStripPrefix())
-                    .requireAuth(config.isRequireAuth())
+                    .requireAuth(config.isRequireAuth())  // 确保获取最新的 requireAuth 配置
                     .headerTransforms(config.getHeaderTransforms())
                     .build();
 
             newRoutes.add(route);
-            log.info("加载路由: id={}, pattern={}, targets={}",
-                    route.getId(), route.getPathPattern(), route.getTargets());
+            log.info("加载路由: id={}, pattern={}, targets={}, requireAuth={}",
+                    route.getId(), route.getPathPattern(), route.getTargets(), config.isRequireAuth());
         }
 
         // 按路径模式长度排序（更精确的匹配优先）
@@ -119,7 +142,20 @@ public class Router {
 
         for (RouteDefinition route : routes) {
             if (pathMatcher.match(route.getPathPattern(), path)) {
-                log.debug("请求 {} 匹配路由 {}", path, route.getId());
+                // 为了确保路由配置是最新的，这里也从配置中获取最新的 requireAuth 值
+                GatewayProperties properties = getProperties();
+                if (properties != null && properties.getRoutes() != null) {
+                    Optional<GatewayProperties.RouteProperties> config = properties.getRoutes().stream()
+                        .filter(r -> r.getId().equals(route.getId()))
+                        .findFirst();
+                    
+                    if (config.isPresent()) {
+                        // 更新路由对象的 requireAuth 值，确保使用最新的配置
+                        route.setRequireAuth(config.get().isRequireAuth());
+                    }
+                }
+                
+                log.debug("请求 {} 匹配路由 {} (requireAuth={})", path, route.getId(), route.isRequireAuth());
                 return route;
             }
         }
@@ -218,7 +254,33 @@ public class Router {
      */
     public void refresh() {
         log.info("刷新路由配置...");
+        int oldSize = routes.size();
+        
+        // 先输出当前路由状态
+        log.info("刷新前路由状态:");
+        for (RouteDefinition route : routes) {
+            log.info("  路由: id={}, requireAuth={}", route.getId(), route.isRequireAuth());
+        }
+        
+        // 获取最新的配置信息
+        GatewayProperties properties = getProperties();
+        if (properties != null && properties.getRoutes() != null) {
+            log.info("配置中的路由状态:");
+            for (GatewayProperties.RouteProperties config : properties.getRoutes()) {
+                log.info("  配置: id={}, requireAuth={}", config.getId(), config.isRequireAuth());
+            }
+        }
+        
         loadRoutesFromConfig();
+        int newSize = routes.size();
+        
+        // 输出路由变更信息，特别是 require-auth 的变更
+        log.info("路由配置刷新完成，路由数量: {} -> {}", oldSize, newSize);
+        log.info("刷新后路由状态:");
+        for (RouteDefinition route : routes) {
+            log.info("  路由: id={}, pattern={}, requireAuth={}", 
+                    route.getId(), route.getPathPattern(), route.isRequireAuth());
+        }
     }
 
     /**
@@ -250,5 +312,24 @@ public class Router {
      */
     public List<RouteDefinition> getRoutes() {
         return new ArrayList<>(routes);
+    }
+    
+    /**
+     * 获取路由的最新 requireAuth 状态
+     * 用于在运行时获取最新的配置状态
+     * 
+     * @param routeId 路由ID
+     * @return requireAuth 状态，如果路由不存在返回true（默认需要鉴权）
+     */
+    public boolean getLatestRequireAuth(String routeId) {
+        GatewayProperties properties = getProperties();
+        if (properties != null && properties.getRoutes() != null) {
+            return properties.getRoutes().stream()
+                .filter(r -> routeId.equals(r.getId()))
+                .findFirst()
+                .map(GatewayProperties.RouteProperties::isRequireAuth)
+                .orElse(true); // 默认返回true，即需要鉴权
+        }
+        return true; // 默认需要鉴权
     }
 }

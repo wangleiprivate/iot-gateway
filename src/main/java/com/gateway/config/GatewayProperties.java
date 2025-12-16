@@ -2,6 +2,7 @@ package com.gateway.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
@@ -14,15 +15,14 @@ import java.util.Map;
  * 从 application.yml 或 Nacos 配置中心绑定配置到 Java 对象
  * 支持 Nacos 配置热更新
  *
- * 注意：不使用 @RefreshScope，因为 @ConfigurationProperties 类
- * 会由 Spring Cloud 的 ConfigurationPropertiesRebinder 自动刷新
- * 使用 ObjectProvider 注入此 Bean 可获取最新配置
+ * 使用 @RefreshScope 以确保配置热更新生效
  *
  * @author Gateway Team
  * @version 1.0.0
  */
 @Data
 @Validated
+@org.springframework.cloud.context.config.annotation.RefreshScope
 @ConfigurationProperties(prefix = "gateway")
 public class GatewayProperties {
 

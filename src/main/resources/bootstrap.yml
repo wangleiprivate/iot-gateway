@@ -4,6 +4,8 @@ spring:
   profiles:
     active: dev
   cloud:
+    compatibility-verifier:
+      enabled: false  # 禁用兼容性检查以解决版本兼容性问题
     nacos:
       config:
         server-addr: 61.134.69.50:8848

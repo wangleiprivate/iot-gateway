@@ -3,8 +3,8 @@
     {
       "id": "2d919624-b0c3-42f9-8b99-c1a024633daa",
       "name": "创建Maven项目结构和pom.xml",
-      "description": "创建完整的Maven项目结构，包括pom.xml配置文件，引入所有必要依赖：Spring Boot 3.2.5、Spring Cloud Alibaba 2023.0.1.0、Reactor Netty、Resilience4j、Bucket4j等",
-      "notes": "确保版本兼容性：Spring Boot 3.2.5 + Spring Cloud 2023.0.1 + Spring Cloud Alibaba 2023.0.1.0",
+      "description": "创建完整的Maven项目结构，包括pom.xml配置文件，引入所有必要依赖：Spring Boot 3.2.5、Spring Cloud Alibaba 025.0.0.0、Reactor Netty、Resilience4j、Bucket4j等",
+      "notes": "确保版本兼容性：Spring Boot 3.2.5 + Spring Cloud 2023.0.1 + Spring Cloud Alibaba 2025.0.0.0",
       "status": "pending",
       "dependencies": [],
       "createdAt": "2025-12-11T10:52:46.936Z",

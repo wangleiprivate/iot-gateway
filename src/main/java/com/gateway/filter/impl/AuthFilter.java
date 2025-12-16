@@ -97,11 +97,39 @@ public class AuthFilter implements GatewayFilter {
             return chain.filter(request);
         }
 
-        // 检查路由是否需要鉴权
+        // 检查路由是否需要鉴权 - 确保获取最新的路由配置
         RouteDefinition route = router.match(request);
-        if (route != null && !route.isRequireAuth()) {
-            log.debug("[{}] 路由 {} 不需要鉴权", request.getTraceId(), route.getId());
-            return chain.filter(request);
+        if (route != null) {
+            // 获取最新的 requireAuth 状态
+            // 这里使用 router 的辅助方法来获取最新的配置状态，确保使用最新值
+            boolean latestRequireAuth = router.getLatestRequireAuth(route.getId());
+            
+            // 更新路由对象的 requireAuth 值以确保一致性
+            route.setRequireAuth(latestRequireAuth);
+            
+            // 记录当前路由的鉴权配置状态，便于调试热加载
+            log.info("[{}] 路由 {} requireAuth={}", request.getTraceId(), route.getId(), route.isRequireAuth());
+            
+            // 额外调试：直接从配置获取 requireAuth 值进行对比
+            GatewayProperties properties = getProperties();
+            if (properties != null && properties.getRoutes() != null) {
+                properties.getRoutes().stream()
+                    .filter(r -> route.getId().equals(r.getId()))
+                    .findFirst()
+                    .ifPresent(r -> {
+                        log.info("[{}] 配置中的路由 {} requireAuth={}", 
+                                request.getTraceId(), r.getId(), r.isRequireAuth());
+                        if (r.isRequireAuth() != route.isRequireAuth()) {
+                            log.error("[{}] 配置不一致！配置值: {}, 路由对象值: {}", 
+                                    request.getTraceId(), r.isRequireAuth(), route.isRequireAuth());
+                        }
+                    });
+            }
+            
+            if (!route.isRequireAuth()) {
+                log.info("[{}] 路由 {} 配置为无需鉴权，直接放行", request.getTraceId(), route.getId());
+                return chain.filter(request);
+            }
         }
 
         // 获取 Token
