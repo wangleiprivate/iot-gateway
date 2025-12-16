@@ -1,5 +1,6 @@
 package com.gateway.filter.impl;
 
+import com.gateway.config.GatewayConfigHolder;
 import com.gateway.config.GatewayProperties;
 import com.gateway.filter.FilterChain;
 import com.gateway.filter.GatewayFilter;
@@ -8,7 +9,6 @@ import com.gateway.model.GatewayResponse;
 import com.gateway.util.IpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -27,20 +27,21 @@ public class IpWhitelistFilter implements GatewayFilter {
     private static final Logger log = LoggerFactory.getLogger(IpWhitelistFilter.class);
 
     /**
-     * 使用 ObjectProvider 延迟获取 GatewayProperties
-     * 这样每次调用时都能获取到 @RefreshScope 刷新后的最新配置
+     * 使用 GatewayConfigHolder 获取最新配置
+     * GatewayConfigHolder 通过 Nacos 原生 API 实现热更新，绕过 Spring 的配置绑定问题
      */
-    private final ObjectProvider<GatewayProperties> propertiesProvider;
+    private final GatewayConfigHolder configHolder;
 
-    public IpWhitelistFilter(ObjectProvider<GatewayProperties> propertiesProvider) {
-        this.propertiesProvider = propertiesProvider;
+    public IpWhitelistFilter(GatewayConfigHolder configHolder) {
+        this.configHolder = configHolder;
     }
 
     /**
      * 获取当前的 GatewayProperties 配置
+     * 每次调用都会获取最新的配置（支持 Nacos 热更新）
      */
     private GatewayProperties getProperties() {
-        return propertiesProvider.getIfAvailable();
+        return configHolder.getProperties();
     }
 
     @Override

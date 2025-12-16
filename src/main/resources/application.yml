@@ -7,7 +7,7 @@ spring:
 # Gateway Configuration
 gateway:
   server:
-    port: 8081
+    port: 8080
     netty:
       boss-threads: 1
       worker-threads: 0  # 0 means Netty auto-calculates based on CPU cores

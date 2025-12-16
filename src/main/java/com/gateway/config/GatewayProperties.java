@@ -2,7 +2,6 @@ package com.gateway.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
@@ -13,16 +12,18 @@ import java.util.Map;
 /**
  * 网关配置属性类
  * 从 application.yml 或 Nacos 配置中心绑定配置到 Java 对象
- * 支持 Nacos 配置热更新
  *
- * 使用 @RefreshScope 以确保配置热更新生效
+ * 注意：不再使用 @RefreshScope，因为 Spring Cloud Alibaba 2025.0.0.0 存在已知 BUG
+ * @RefreshScope + @ConfigurationProperties 组合会导致配置绑定失败
+ * 参考 GitHub Issue: https://github.com/alibaba/nacos/issues/13907
+ *
+ * 热更新通过 GatewayConfigHolder 实现，使用 Nacos ConfigService 直接监听配置变化
  *
  * @author Gateway Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 @Data
 @Validated
-@org.springframework.cloud.context.config.annotation.RefreshScope
 @ConfigurationProperties(prefix = "gateway")
 public class GatewayProperties {
 

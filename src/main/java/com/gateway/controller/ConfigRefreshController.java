@@ -1,8 +1,8 @@
 package com.gateway.controller;
 
+import com.gateway.config.GatewayConfigHolder;
 import com.gateway.config.GatewayProperties;
 import com.gateway.util.ConfigDebugUtil;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,24 +20,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/config")
 public class ConfigRefreshController {
 
-    private final ObjectProvider<GatewayProperties> propertiesProvider;
+    private final GatewayConfigHolder configHolder;
     private final ConfigDebugUtil configDebugUtil;
 
-    public ConfigRefreshController(ObjectProvider<GatewayProperties> propertiesProvider, 
+    public ConfigRefreshController(GatewayConfigHolder configHolder,
                                   ConfigDebugUtil configDebugUtil) {
-        this.propertiesProvider = propertiesProvider;
+        this.configHolder = configHolder;
         this.configDebugUtil = configDebugUtil;
     }
 
     /**
      * 获取当前配置状态
-     * 
+     *
      * @return 当前配置信息
      */
     @GetMapping("/status")
     public ResponseEntity<String> getConfigStatus() {
         StringBuilder status = new StringBuilder();
-        GatewayProperties properties = propertiesProvider.getIfAvailable();
+        GatewayProperties properties = configHolder.getProperties();
         if (properties != null && properties.getRoutes() != null) {
             status.append("Current Gateway Configuration:\n");
             status.append("Routes:\n");
@@ -48,7 +48,7 @@ public class ConfigRefreshController {
         } else {
             status.append("GatewayProperties not available\n");
         }
-        
+
         return ResponseEntity.ok(status.toString());
     }
 

@@ -1,10 +1,10 @@
 package com.gateway.util;
 
+import com.gateway.config.GatewayConfigHolder;
 import com.gateway.config.GatewayProperties;
 import com.gateway.router.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,11 +19,11 @@ public class ConfigDebugUtil {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigDebugUtil.class);
 
-    private final ObjectProvider<GatewayProperties> propertiesProvider;
+    private final GatewayConfigHolder configHolder;
     private final Router router;
 
-    public ConfigDebugUtil(ObjectProvider<GatewayProperties> propertiesProvider, Router router) {
-        this.propertiesProvider = propertiesProvider;
+    public ConfigDebugUtil(GatewayConfigHolder configHolder, Router router) {
+        this.configHolder = configHolder;
         this.router = router;
     }
 
@@ -31,7 +31,7 @@ public class ConfigDebugUtil {
      * 打印当前配置状态
      */
     public void printCurrentConfig() {
-        GatewayProperties properties = propertiesProvider.getIfAvailable();
+        GatewayProperties properties = configHolder.getProperties();
         if (properties == null) {
             log.warn("GatewayProperties 不可用");
             return;
@@ -90,12 +90,12 @@ public class ConfigDebugUtil {
 
     /**
      * 获取特定路由的 requireAuth 状态
-     * 
+     *
      * @param routeId 路由ID
      * @return requireAuth 状态
      */
     public boolean getRouteRequireAuthStatus(String routeId) {
-        GatewayProperties properties = propertiesProvider.getIfAvailable();
+        GatewayProperties properties = configHolder.getProperties();
         if (properties != null && properties.getRoutes() != null) {
             return properties.getRoutes().stream()
                 .filter(r -> routeId.equals(r.getId()))

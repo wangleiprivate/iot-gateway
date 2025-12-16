@@ -1,5 +1,6 @@
 package com.gateway.filter.impl;
 
+import com.gateway.config.GatewayConfigHolder;
 import com.gateway.config.GatewayProperties;
 import com.gateway.filter.FilterChain;
 import com.gateway.filter.GatewayFilter;
@@ -13,7 +14,6 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -33,16 +33,16 @@ public class CircuitBreakerFilter implements GatewayFilter {
     private static final Logger log = LoggerFactory.getLogger(CircuitBreakerFilter.class);
 
     /**
-     * 使用 ObjectProvider 延迟获取 GatewayProperties
-     * 这样每次调用时都能获取到 ConfigurationPropertiesRebinder 刷新后的最新配置（支持 Nacos 热更新）
+     * 使用 GatewayConfigHolder 获取最新配置
+     * GatewayConfigHolder 通过 Nacos 原生 API 实现热更新，绕过 Spring 的配置绑定问题
      */
-    private final ObjectProvider<GatewayProperties> propertiesProvider;
+    private final GatewayConfigHolder configHolder;
     private final Router router;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final ConcurrentHashMap<String, CircuitBreaker> routeCircuitBreakers = new ConcurrentHashMap<>();
 
-    public CircuitBreakerFilter(ObjectProvider<GatewayProperties> propertiesProvider, Router router) {
-        this.propertiesProvider = propertiesProvider;
+    public CircuitBreakerFilter(GatewayConfigHolder configHolder, Router router) {
+        this.configHolder = configHolder;
         this.router = router;
         this.circuitBreakerRegistry = createCircuitBreakerRegistry();
     }
@@ -52,7 +52,7 @@ public class CircuitBreakerFilter implements GatewayFilter {
      * 每次调用都会获取最新的配置（支持 Nacos 热更新）
      */
     private GatewayProperties getProperties() {
-        return propertiesProvider.getIfAvailable();
+        return configHolder.getProperties();
     }
 
     /**
