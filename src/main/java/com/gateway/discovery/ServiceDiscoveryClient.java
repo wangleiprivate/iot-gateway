@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 服务发现客户端
  * 封装 Spring Cloud DiscoveryClient，提供服务实例获取和负载均衡功能
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component

@@ -8,7 +8,7 @@ import reactor.core.publisher.Mono;
  * 网关过滤器接口
  * 所有过滤器都需要实现此接口
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 public interface GatewayFilter {

@@ -13,7 +13,7 @@ import java.util.Map;
  * 网关请求模型
  * 封装 HTTP 请求的所有信息
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Data

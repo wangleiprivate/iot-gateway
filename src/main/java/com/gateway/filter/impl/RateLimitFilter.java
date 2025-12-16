@@ -10,6 +10,7 @@ import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -20,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 限流过滤器
  * 基于令牌桶算法实现限流
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component
@@ -28,7 +29,11 @@ public class RateLimitFilter implements GatewayFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
-    private final GatewayProperties properties;
+    /**
+     * 使用 ObjectProvider 延迟获取 GatewayProperties
+     * 这样每次调用时都能获取到 ConfigurationPropertiesRebinder 刷新后的最新配置（支持 Nacos 热更新）
+     */
+    private final ObjectProvider<GatewayProperties> propertiesProvider;
 
     /**
      * 全局限流桶
@@ -40,16 +45,26 @@ public class RateLimitFilter implements GatewayFilter {
      */
     private final ConcurrentHashMap<String, Bucket> clientBuckets = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(GatewayProperties properties) {
-        this.properties = properties;
+    public RateLimitFilter(ObjectProvider<GatewayProperties> propertiesProvider) {
+        this.propertiesProvider = propertiesProvider;
         initGlobalBucket();
+    }
+
+    /**
+     * 获取当前的 GatewayProperties 配置
+     * 每次调用都会获取最新的配置（支持 Nacos 热更新）
+     */
+    private GatewayProperties getProperties() {
+        return propertiesProvider.getIfAvailable();
     }
 
     /**
      * 初始化全局限流桶
      */
     private void initGlobalBucket() {
-        GatewayProperties.RateLimitProperties rateLimitConfig = properties.getRateLimit();
+        GatewayProperties properties = getProperties();
+        GatewayProperties.RateLimitProperties rateLimitConfig = (properties != null)
+                ? properties.getRateLimit() : null;
         if (rateLimitConfig == null) {
             rateLimitConfig = new GatewayProperties.RateLimitProperties();
         }
@@ -84,7 +99,8 @@ public class RateLimitFilter implements GatewayFilter {
 
     @Override
     public boolean isEnabled() {
-        return properties.getRateLimit() != null && properties.getRateLimit().isEnabled();
+        GatewayProperties properties = getProperties();
+        return properties != null && properties.getRateLimit() != null && properties.getRateLimit().isEnabled();
     }
 
     @Override
@@ -98,7 +114,9 @@ public class RateLimitFilter implements GatewayFilter {
         }
 
         // 检查客户端限流
-        if (properties.getRateLimit().getPerClient() != null
+        GatewayProperties properties = getProperties();
+        if (properties != null && properties.getRateLimit() != null
+                && properties.getRateLimit().getPerClient() != null
                 && properties.getRateLimit().getPerClient().isEnabled()) {
 
             Bucket clientBucket = getClientBucket(clientIp);
@@ -120,7 +138,12 @@ public class RateLimitFilter implements GatewayFilter {
      */
     private Bucket getClientBucket(String clientIp) {
         return clientBuckets.computeIfAbsent(clientIp, ip -> {
-            GatewayProperties.RateLimitProperties rateLimitConfig = properties.getRateLimit();
+            GatewayProperties properties = getProperties();
+            GatewayProperties.RateLimitProperties rateLimitConfig = (properties != null)
+                    ? properties.getRateLimit() : new GatewayProperties.RateLimitProperties();
+            if (rateLimitConfig == null) {
+                rateLimitConfig = new GatewayProperties.RateLimitProperties();
+            }
 
             // 客户端限流使用更小的容量（全局容量的 1/10）
             int clientCapacity = Math.max(1, rateLimitConfig.getCapacity() / 10);

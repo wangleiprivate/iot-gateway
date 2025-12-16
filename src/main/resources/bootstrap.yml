@@ -1,18 +1,20 @@
 spring:
   application:
-    name: claude-gateway
+    name: iot-gateway
+  profiles:
+    active: dev
   cloud:
     nacos:
       config:
         server-addr: 61.134.69.50:8848
-        namespace: iot_gateway_dev
+        namespace: iot_gateway
         group: IOT_GROUP
-        file-extension: yaml
-        prefix: gateway-config
+        file-extension: yml
+        prefix: application
         enabled: true
         refresh-enabled: true
       discovery:
         server-addr: 61.134.69.50:8848
-        namespace: iot_gateway_dev
+        namespace: iot_gateway
         group: IOT_GROUP
         enabled: true

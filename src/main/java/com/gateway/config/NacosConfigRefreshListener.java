@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.environment.EnvironmentChangeEvent;
-import org.springframework.cloud.context.properties.ConfigurationPropertiesRebinder;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -16,6 +15,8 @@ import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -29,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 1. Spring Cloud 环境变更事件监听（推荐，与 Spring Cloud 生态集成）
  * 2. Nacos 原生配置监听器（备选，更精确控制）
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component
@@ -41,10 +42,10 @@ public class NacosConfigRefreshListener {
     private final Router router;
 
     /**
-     * Nacos 配置数据 ID
+     * Nacos 配置数据 ID 前缀
      */
-    @Value("${spring.cloud.nacos.config.prefix:gateway-config}")
-    private String dataId;
+    @Value("${spring.cloud.nacos.config.prefix:application}")
+    private String prefix;
 
     /**
      * Nacos 配置组
@@ -55,8 +56,14 @@ public class NacosConfigRefreshListener {
     /**
      * Nacos 配置文件扩展名
      */
-    @Value("${spring.cloud.nacos.config.file-extension:yaml}")
+    @Value("${spring.cloud.nacos.config.file-extension:yml}")
     private String fileExtension;
+
+    /**
+     * 当前激活的 profile
+     */
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
 
     /**
      * 配置刷新执行器
@@ -68,9 +75,9 @@ public class NacosConfigRefreshListener {
     });
 
     /**
-     * Nacos 配置监听器实例
+     * Nacos 配置监听器实例列表
      */
-    private Listener configListener;
+    private final List<ListenerInfo> configListeners = new ArrayList<>();
 
     /**
      * 防止重复刷新的标志
@@ -84,14 +91,30 @@ public class NacosConfigRefreshListener {
 
     /**
      * 初始化 Nacos 原生配置监听器
+     * 同时监听基础配置和 profile 配置
      */
     @PostConstruct
     public void init() {
-        String fullDataId = dataId + "." + fileExtension;
+        // 监听基础配置文件: application.yml
+        String baseDataId = prefix + "." + fileExtension;
+        registerListener(baseDataId);
 
-        log.info("初始化 Nacos 配置监听器: dataId={}, group={}", fullDataId, group);
+        // 如果有激活的 profile，也监听 profile 配置文件: application-dev.yml
+        if (activeProfile != null && !activeProfile.isEmpty()) {
+            String profileDataId = prefix + "-" + activeProfile + "." + fileExtension;
+            registerListener(profileDataId);
+        }
+    }
 
-        configListener = new Listener() {
+    /**
+     * 注册配置监听器
+     *
+     * @param dataId 配置 ID
+     */
+    private void registerListener(String dataId) {
+        log.info("初始化 Nacos 配置监听器: dataId={}, group={}", dataId, group);
+
+        Listener listener = new Listener() {
             @Override
             public Executor getExecutor() {
                 return refreshExecutor;
@@ -99,16 +122,17 @@ public class NacosConfigRefreshListener {
 
             @Override
             public void receiveConfigInfo(String configInfo) {
-                log.info("收到 Nacos 配置变更通知 (原生监听器)");
+                log.info("收到 Nacos 配置变更通知 (原生监听器): dataId={}", dataId);
                 doRefresh();
             }
         };
 
         try {
-            nacosConfigManager.getConfigService().addListener(fullDataId, group, configListener);
-            log.info("Nacos 配置监听器注册成功");
+            nacosConfigManager.getConfigService().addListener(dataId, group, listener);
+            configListeners.add(new ListenerInfo(dataId, listener));
+            log.info("Nacos 配置监听器注册成功: dataId={}", dataId);
         } catch (NacosException e) {
-            log.error("注册 Nacos 配置监听器失败", e);
+            log.error("注册 Nacos 配置监听器失败: dataId={}", dataId, e);
         }
     }
 
@@ -159,18 +183,31 @@ public class NacosConfigRefreshListener {
     }
 
     /**
-     * 销毁时移除监听器
+     * 销毁时移除所有监听器
      */
     @PreDestroy
     public void destroy() {
-        if (configListener != null) {
-            String fullDataId = dataId + "." + fileExtension;
+        for (ListenerInfo info : configListeners) {
             try {
-                nacosConfigManager.getConfigService().removeListener(fullDataId, group, configListener);
-                log.info("Nacos 配置监听器已移除");
+                nacosConfigManager.getConfigService().removeListener(info.dataId, group, info.listener);
+                log.info("Nacos 配置监听器已移除: dataId={}", info.dataId);
             } catch (Exception e) {
-                log.error("移除 Nacos 配置监听器失败", e);
+                log.error("移除 Nacos 配置监听器失败: dataId={}", info.dataId, e);
             }
+        }
+        configListeners.clear();
+    }
+
+    /**
+     * 监听器信息
+     */
+    private static class ListenerInfo {
+        final String dataId;
+        final Listener listener;
+
+        ListenerInfo(String dataId, Listener listener) {
+            this.dataId = dataId;
+            this.listener = listener;
         }
     }
 }

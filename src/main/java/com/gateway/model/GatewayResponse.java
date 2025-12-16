@@ -12,7 +12,7 @@ import java.util.Map;
  * 网关响应模型
  * 封装 HTTP 响应的所有信息
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Data

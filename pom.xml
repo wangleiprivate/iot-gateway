@@ -14,7 +14,7 @@
     <groupId>com.gateway</groupId>
     <artifactId>iot-gateway</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>claude-gateway</name>
+    <name>iot-gateway</name>
     <description>High-performance API Gateway based on Netty + Spring Boot + Nacos</description>
 
     <properties>

@@ -8,6 +8,7 @@ import com.gateway.model.GatewayResponse;
 import com.gateway.util.IpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -17,7 +18,7 @@ import java.util.List;
  * IP 白名单过滤器
  * 检查客户端 IP 是否在白名单中
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component
@@ -25,10 +26,21 @@ public class IpWhitelistFilter implements GatewayFilter {
 
     private static final Logger log = LoggerFactory.getLogger(IpWhitelistFilter.class);
 
-    private final GatewayProperties properties;
+    /**
+     * 使用 ObjectProvider 延迟获取 GatewayProperties
+     * 这样每次调用时都能获取到 @RefreshScope 刷新后的最新配置
+     */
+    private final ObjectProvider<GatewayProperties> propertiesProvider;
 
-    public IpWhitelistFilter(GatewayProperties properties) {
-        this.properties = properties;
+    public IpWhitelistFilter(ObjectProvider<GatewayProperties> propertiesProvider) {
+        this.propertiesProvider = propertiesProvider;
+    }
+
+    /**
+     * 获取当前的 GatewayProperties 配置
+     */
+    private GatewayProperties getProperties() {
+        return propertiesProvider.getIfAvailable();
     }
 
     @Override
@@ -43,13 +55,20 @@ public class IpWhitelistFilter implements GatewayFilter {
 
     @Override
     public boolean isEnabled() {
-        return properties.getSecurity() != null
+        GatewayProperties properties = getProperties();
+        return properties != null
+                && properties.getSecurity() != null
                 && properties.getSecurity().getIpWhitelist() != null
                 && properties.getSecurity().getIpWhitelist().isEnabled();
     }
 
     @Override
     public Mono<GatewayResponse> filter(GatewayRequest request, FilterChain chain) {
+        GatewayProperties properties = getProperties();
+        if (properties == null || properties.getSecurity() == null || properties.getSecurity().getIpWhitelist() == null) {
+            return chain.filter(request);
+        }
+
         String clientIp = request.getRemoteIp();
         List<String> whitelist = properties.getSecurity().getIpWhitelist().getList();
 

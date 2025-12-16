@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * HTTP 请求处理器
  * 处理所有进入网关的 HTTP 请求
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component

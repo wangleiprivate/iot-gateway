@@ -14,7 +14,7 @@ import java.util.Map;
  * 路由定义模型
  * 定义请求如何路由到后端服务
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Data

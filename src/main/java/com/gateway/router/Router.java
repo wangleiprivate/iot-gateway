@@ -6,6 +6,7 @@ import com.gateway.model.GatewayRequest;
 import com.gateway.model.RouteDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 
@@ -19,7 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 路由器
  * 负责将请求匹配到对应的后端服务
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component
@@ -27,7 +28,11 @@ public class Router {
 
     private static final Logger log = LoggerFactory.getLogger(Router.class);
 
-    private final GatewayProperties properties;
+    /**
+     * 使用 ObjectProvider 延迟获取 GatewayProperties
+     * 这样每次调用时都能获取到 ConfigurationPropertiesRebinder 刷新后的最新配置
+     */
+    private final ObjectProvider<GatewayProperties> propertiesProvider;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     /**
@@ -35,8 +40,16 @@ public class Router {
      */
     private final CopyOnWriteArrayList<RouteDefinition> routes = new CopyOnWriteArrayList<>();
 
-    public Router(GatewayProperties properties) {
-        this.properties = properties;
+    public Router(ObjectProvider<GatewayProperties> propertiesProvider) {
+        this.propertiesProvider = propertiesProvider;
+    }
+
+    /**
+     * 获取当前的 GatewayProperties 配置
+     * 每次调用都会获取最新的配置（支持 Nacos 热更新）
+     */
+    private GatewayProperties getProperties() {
+        return propertiesProvider.getIfAvailable();
     }
 
     /**
@@ -52,6 +65,12 @@ public class Router {
      * 从配置加载路由
      */
     private void loadRoutesFromConfig() {
+        GatewayProperties properties = getProperties();
+        if (properties == null) {
+            log.warn("GatewayProperties 尚未初始化");
+            return;
+        }
+
         List<GatewayProperties.RouteProperties> routeConfigs = properties.getRoutes();
         if (routeConfigs == null || routeConfigs.isEmpty()) {
             log.warn("未配置任何路由");

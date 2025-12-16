@@ -9,6 +9,7 @@ import com.gateway.model.RouteDefinition;
 import com.gateway.router.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import reactor.core.publisher.Mono;
@@ -26,7 +27,7 @@ import java.util.List;
  * 目前第三方鉴权接口地址还未确定，需要后续配置 gateway.security.auth.auth-server-url
  * 鉴权失败时需要提示用户去指定地址进行鉴权
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component
@@ -34,21 +35,39 @@ public class AuthFilter implements GatewayFilter {
 
     private static final Logger log = LoggerFactory.getLogger(AuthFilter.class);
 
-    private final GatewayProperties properties;
+    /**
+     * 使用 ObjectProvider 延迟获取 GatewayProperties
+     * 这样每次调用时都能获取到 @RefreshScope 刷新后的最新配置
+     */
+    private final ObjectProvider<GatewayProperties> propertiesProvider;
     private final Router router;
-    private final HttpClient httpClient;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
-    public AuthFilter(GatewayProperties properties, Router router) {
-        this.properties = properties;
+    public AuthFilter(ObjectProvider<GatewayProperties> propertiesProvider, Router router) {
+        this.propertiesProvider = propertiesProvider;
         this.router = router;
-        this.httpClient = HttpClient.create()
-                .responseTimeout(Duration.ofMillis(
-                        properties.getSecurity() != null
-                                && properties.getSecurity().getAuth() != null
-                                ? properties.getSecurity().getAuth().getTimeoutMs()
-                                : 500
-                ));
+    }
+
+    /**
+     * 获取当前的 GatewayProperties 配置
+     * 每次调用都会获取最新的配置（支持 @RefreshScope 热更新）
+     */
+    private GatewayProperties getProperties() {
+        return propertiesProvider.getIfAvailable();
+    }
+
+    /**
+     * 创建 HTTP 客户端（用于 Token 验证）
+     * 每次调用时获取最新的超时配置
+     */
+    private HttpClient createHttpClient() {
+        GatewayProperties properties = getProperties();
+        int timeoutMs = (properties != null
+                && properties.getSecurity() != null
+                && properties.getSecurity().getAuth() != null)
+                ? properties.getSecurity().getAuth().getTimeoutMs()
+                : 500;
+        return HttpClient.create().responseTimeout(Duration.ofMillis(timeoutMs));
     }
 
     @Override
@@ -121,7 +140,8 @@ public class AuthFilter implements GatewayFilter {
      * @return 是否跳过
      */
     private boolean shouldSkipAuth(String path) {
-        if (properties.getSecurity() == null || properties.getSecurity().getAuth() == null) {
+        GatewayProperties properties = getProperties();
+        if (properties == null || properties.getSecurity() == null || properties.getSecurity().getAuth() == null) {
             return false;
         }
 
@@ -153,14 +173,24 @@ public class AuthFilter implements GatewayFilter {
      * @return 验证结果
      */
     private Mono<Boolean> verifyToken(String token, String traceId) {
-        String authServerUrl = properties.getSecurity().getAuth().getAuthServerUrl();
-
-        if (authServerUrl == null || authServerUrl.isEmpty()) {
-            log.warn("[{}] 未配置认证服务地址，默认允许通过", traceId);
+        GatewayProperties properties = getProperties();
+        if (properties == null || properties.getSecurity() == null || properties.getSecurity().getAuth() == null) {
+            log.warn("[{}] GatewayProperties 未初始化或安全配置缺失，默认允许通过", traceId);
             return Mono.just(true);
         }
 
-        return httpClient
+        String authServerUrl = properties.getSecurity().getAuth().getAuthServerUrl();
+
+        if (authServerUrl == null || authServerUrl.isEmpty()) {
+            // 未配置认证服务地址时，拒绝所有需要鉴权的请求
+            // 这样可以确保安全性：宁可误拒也不误放
+            log.error("[{}] 未配置认证服务地址 (gateway.security.auth.auth-server-url)，拒绝请求", traceId);
+            return Mono.just(false);
+        }
+
+        int timeoutMs = properties.getSecurity().getAuth().getTimeoutMs();
+
+        return createHttpClient()
                 .headers(headers -> {
                     headers.add("Authorization", "Bearer " + token);
                     headers.add("X-Trace-Id", traceId);
@@ -181,7 +211,7 @@ public class AuthFilter implements GatewayFilter {
                                 });
                     }
                 })
-                .timeout(Duration.ofMillis(properties.getSecurity().getAuth().getTimeoutMs()))
+                .timeout(Duration.ofMillis(timeoutMs))
                 .onErrorResume(e -> {
                     log.error("[{}] Token 验证请求失败: {}", traceId, e.getMessage());
                     return Mono.error(e);

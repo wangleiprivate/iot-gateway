@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 链路追踪 ID 生成器
  * 生成全局唯一的追踪标识
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 public final class TraceIdGenerator {

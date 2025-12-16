@@ -11,7 +11,7 @@ import java.util.List;
  * IP 地址工具类
  * 支持 CIDR 格式的 IP 白名单匹配
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 public final class IpUtils {

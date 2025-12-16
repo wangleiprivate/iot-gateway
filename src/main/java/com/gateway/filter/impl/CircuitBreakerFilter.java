@@ -13,6 +13,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -23,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 熔断过滤器
  * 基于 Resilience4j 实现熔断保护
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component
@@ -31,22 +32,36 @@ public class CircuitBreakerFilter implements GatewayFilter {
 
     private static final Logger log = LoggerFactory.getLogger(CircuitBreakerFilter.class);
 
-    private final GatewayProperties properties;
+    /**
+     * 使用 ObjectProvider 延迟获取 GatewayProperties
+     * 这样每次调用时都能获取到 ConfigurationPropertiesRebinder 刷新后的最新配置（支持 Nacos 热更新）
+     */
+    private final ObjectProvider<GatewayProperties> propertiesProvider;
     private final Router router;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final ConcurrentHashMap<String, CircuitBreaker> routeCircuitBreakers = new ConcurrentHashMap<>();
 
-    public CircuitBreakerFilter(GatewayProperties properties, Router router) {
-        this.properties = properties;
+    public CircuitBreakerFilter(ObjectProvider<GatewayProperties> propertiesProvider, Router router) {
+        this.propertiesProvider = propertiesProvider;
         this.router = router;
         this.circuitBreakerRegistry = createCircuitBreakerRegistry();
+    }
+
+    /**
+     * 获取当前的 GatewayProperties 配置
+     * 每次调用都会获取最新的配置（支持 Nacos 热更新）
+     */
+    private GatewayProperties getProperties() {
+        return propertiesProvider.getIfAvailable();
     }
 
     /**
      * 创建熔断器注册表
      */
     private CircuitBreakerRegistry createCircuitBreakerRegistry() {
-        GatewayProperties.CircuitBreakerProperties cbConfig = properties.getCircuitBreaker();
+        GatewayProperties properties = getProperties();
+        GatewayProperties.CircuitBreakerProperties cbConfig = (properties != null)
+                ? properties.getCircuitBreaker() : null;
         if (cbConfig == null) {
             cbConfig = new GatewayProperties.CircuitBreakerProperties();
         }
@@ -80,7 +95,8 @@ public class CircuitBreakerFilter implements GatewayFilter {
 
     @Override
     public boolean isEnabled() {
-        return properties.getCircuitBreaker() != null && properties.getCircuitBreaker().isEnabled();
+        GatewayProperties properties = getProperties();
+        return properties != null && properties.getCircuitBreaker() != null && properties.getCircuitBreaker().isEnabled();
     }
 
     @Override

@@ -10,7 +10,7 @@ import java.util.List;
  * 过滤器链
  * 实现责任链模式，按顺序执行过滤器
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 public class FilterChain {

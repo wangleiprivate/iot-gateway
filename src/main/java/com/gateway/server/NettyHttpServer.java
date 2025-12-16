@@ -14,7 +14,7 @@ import java.time.Duration;
  * Netty HTTP 服务器
  * 网关的核心入口点
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component
@@ -61,7 +61,7 @@ public class NettyHttpServer {
                     .bindNow(Duration.ofSeconds(30));
 
             log.info("========================================");
-            log.info("  Claude Gateway 启动成功!");
+            log.info("  Gateway 启动成功!");
             log.info("  监听端口: {}", port);
             log.info("  服务地址: http://localhost:{}", port);
             log.info("========================================");

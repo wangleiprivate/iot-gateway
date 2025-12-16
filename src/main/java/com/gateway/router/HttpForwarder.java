@@ -19,7 +19,7 @@ import java.util.Map;
  * HTTP 转发器
  * 负责将请求转发到后端服务
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Component

@@ -11,9 +11,14 @@ import java.util.Map;
 
 /**
  * 网关配置属性类
- * 从 application.yml 绑定配置到 Java 对象
+ * 从 application.yml 或 Nacos 配置中心绑定配置到 Java 对象
+ * 支持 Nacos 配置热更新
  *
- * @author Claude Gateway Team
+ * 注意：不使用 @RefreshScope，因为 @ConfigurationProperties 类
+ * 会由 Spring Cloud 的 ConfigurationPropertiesRebinder 自动刷新
+ * 使用 ObjectProvider 注入此 Bean 可获取最新配置
+ *
+ * @author Gateway Team
  * @version 1.0.0
  */
 @Data

@@ -13,9 +13,8 @@ import org.springframework.context.annotation.Bean;
 
 /**
  * 统一网关启动类
- * 基于 Netty + Spring Boot + Nacos 的高性能 API 网关
  *
- * @author Claude Gateway Team
+ * @author Gateway Team
  * @version 1.0.0
  */
 @SpringBootApplication
@@ -38,7 +37,7 @@ public class GatewayApplication {
         return args -> {
             this.nettyHttpServer = server;
             log.info("========================================");
-            log.info("  Claude Gateway Starting...");
+            log.info("  Gateway Starting...");
             log.info("========================================");
             server.start();
         };
