@@ -87,22 +87,4 @@ public class ConfigDebugUtil {
 
         log.info("===================");
     }
-
-    /**
-     * 获取特定路由的 requireAuth 状态
-     *
-     * @param routeId 路由ID
-     * @return requireAuth 状态
-     */
-    public boolean getRouteRequireAuthStatus(String routeId) {
-        GatewayProperties properties = configHolder.getProperties();
-        if (properties != null && properties.getRoutes() != null) {
-            return properties.getRoutes().stream()
-                .filter(r -> routeId.equals(r.getId()))
-                .findFirst()
-                .map(GatewayProperties.RouteProperties::isRequireAuth)
-                .orElse(true);
-        }
-        return true; // 默认需要鉴权
-    }
 }

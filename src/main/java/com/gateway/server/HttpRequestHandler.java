@@ -1,6 +1,5 @@
 package com.gateway.server;
 
-import com.gateway.config.GatewayProperties;
 import com.gateway.filter.FilterChain;
 import com.gateway.filter.GatewayFilter;
 import com.gateway.model.GatewayRequest;
@@ -42,15 +41,13 @@ public class HttpRequestHandler implements BiFunction<HttpServerRequest, HttpSer
 
     private final List<GatewayFilter> filters;
     private final HttpForwarder httpForwarder;
-    private final GatewayProperties properties;
 
-    public HttpRequestHandler(List<GatewayFilter> filters, HttpForwarder httpForwarder, GatewayProperties properties) {
+    public HttpRequestHandler(List<GatewayFilter> filters, HttpForwarder httpForwarder) {
         // 按 order 排序过滤器
         this.filters = filters.stream()
                 .sorted(Comparator.comparingInt(GatewayFilter::getOrder))
                 .collect(Collectors.toList());
         this.httpForwarder = httpForwarder;
-        this.properties = properties;
 
         log.info("HTTP 请求处理器初始化完成，已加载 {} 个过滤器", this.filters.size());
         for (GatewayFilter filter : this.filters) {
