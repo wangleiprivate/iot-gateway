@@ -1,0 +1,43 @@
+# 版本控制
+.git
+../.gitignore
+
+# 构建输出
+build
+target
+node_modules
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+
+# Maven
+.mvn
+mvnw
+mvnw.cmd
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 文档（构建时不需要）
+docs/
+README.md
+CONTRIBUTING.md

@@ -1,0 +1,99 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Nacos配置
+spring:
+  application:
+    name: iot-gateway
+  config:
+    import: optional:nacos:gateway-${SPRING_PROFILES_ACTIVE}.yml
+  cloud:
+    nacos:
+      config:
+        server-addr: nacos:8848
+        namespace: dev
+        group: DEFAULT_GROUP
+        file-extension: yml
+        shared-configs:
+          - data-id: gateway-common.yml
+            group: COMMON_GROUP
+            refresh: true
+        username: nacos
+        password: nacos
+        context-path: /nacos
+        cluster-mode: false
+        encode: UTF-8
+        config-long-poll-timeout: 30000
+        config-retry-time: 3000
+        max-retry: 3
+        enable-remote-sync-config: true
+        config-decrypt: false
+        decrypt-key: ${CONFIG_DECRYPT_KEY:}
+        enable-import-substitution-in-template: false
+
+# 网关配置
+gateway:
+  server:
+    port: 8080
+    netty:
+      boss-threads: 2
+      worker-threads: 8
+  security:
+    auth:
+      enabled: true
+      skip-paths:
+        - /actuator/**
+        - /health
+        - /info
+      auth-server-url: http://auth-service:8081
+      timeout-ms: 3000
+    ip-whitelist:
+      enabled: false
+      list: []
+  rate-limit:
+    enabled: true
+    capacity: 1000
+    refill-tokens: 100
+    refill-period-seconds: 60
+    per-client:
+      enabled: true
+      capacity: 100
+      refill-tokens: 10
+      refill-period-seconds: 60
+  circuit-breaker:
+    enabled: true
+    failure-rate-threshold: 50
+    wait-duration-open-state-seconds: 60
+    sliding-window-size: 100
+    minimum-number-of-calls: 20
+    slow-call-duration-threshold-ms: 5000
+    slow-call-rate-threshold: 50
+
+# 管理端点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.gateway: INFO
+    org.springframework: WARN
+    reactor.netty: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /app/logs/gateway.log

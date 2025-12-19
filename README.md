@@ -114,11 +114,201 @@ gateway:
 `GatewayConfigHolder` 通过 Nacos 原生 API 监听配置变更，解析 YAML 并更新内存配置，无需重启服务。该实现解决了 Spring Cloud Alibaba 2025.0.0.0 中 `@RefreshScope` + `@ConfigurationProperties` 的已知 BUG。
 
 ## 7. 部署与运维
-- 打包：`mvn clean package`
+
+### 7.1 传统部署
+- 打包：`mvn clean package -DskipTests`
 - 运行：`java -jar iot-gateway.jar --spring.profiles.active=dev`
-- 健康检查：`GET /health`
-- 监控指标：`/metrics`
-- 管理接口：`/admin/routes`, `/admin/circuit-breakers`
+- 健康检查：`GET /actuator/health`
+- 监控指标：`/actuator/metrics`, `/actuator/prometheus`
+- 管理接口：`/actuator/health`, `/actuator/info`
+
+### 7.2 Docker 部署
+
+#### 前提条件
+- Docker 20.10+
+- Docker Compose 2.0+
+- JDK 17+ (构建时使用)
+
+#### 快速开始
+
+1. **构建镜像**
+   ```bash
+   # 在项目根目录执行
+   docker build -t iot-gateway:latest .
+   ```
+
+2. **使用 Docker Compose 启动**
+   ```bash
+   # 启动所有服务（网关 + Nacos）
+   docker-compose up -d
+   
+   # 查看服务状态
+   docker-compose ps
+   
+   # 查看日志
+   docker-compose logs -f iot-gateway
+   ```
+
+3. **单独运行网关容器**
+   ```bash
+   docker run -d \
+     --name iot-gateway \
+     -p 8080:8080 \
+     -e SPRING_PROFILES_ACTIVE=docker \
+     -v $(pwd)/logs:/app/logs \
+     -v $(pwd)/config:/app/config \
+     iot-gateway:latest
+   ```
+
+#### Docker Compose 服务说明
+
+| 服务名 | 镜像 | 端口 | 说明 |
+|--------|------|------|------|
+| iot-gateway | 自定义构建 | 8080:8080 | IoT网关主服务 |
+| nacos | nacos/nacos-server:v2.2.3 | 8848:8848, 9848:9848 | 配置中心 |
+
+#### 环境配置
+
+Docker环境下使用的配置文件：`config/application-docker.yml`
+
+主要配置差异：
+- Nacos地址：`localhost:8848` → `nacos:8848`
+- 增加健康检查和监控端点
+- 优化JVM参数和日志配置
+- 支持Prometheus监控
+
+### 7.3 Kubernetes 部署（可选）
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: iot-gateway
+  template:
+    metadata:
+      labels:
+        app: iot-gateway
+    spec:
+      containers:
+      - name: iot-gateway
+        image: iot-gateway:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "k8s"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-gateway-service
+spec:
+  selector:
+    app: iot-gateway
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+```
+
+### 7.4 生产环境建议
+
+#### 资源要求
+- **CPU**: 2-4核
+- **内存**: 2-4GB
+- **磁盘**: 10GB+
+- **网络**: 千兆网卡
+
+#### JVM 调优
+```bash
+JAVA_OPTS="\
+  -Xms2g -Xmx2g \
+  -XX:+UseG1GC \
+  -XX:MaxGCPauseMillis=200 \
+  -XX:+HeapDumpOnOutOfMemoryError \
+  -XX:HeapDumpPath=/app/logs/heapdump.hprof \
+  -Dspring.profiles.active=prod \
+  -Dlogging.level.com.gateway=INFO \
+  -Dlogging.level.org.springframework=WARN"
+```
+
+#### 监控告警
+- 配置 Prometheus + Grafana 监控
+- 设置关键指标告警（CPU、内存、QPS、错误率）
+- 配置日志聚合（ELK Stack）
+- 设置健康检查告警
+
+#### 高可用部署
+- 使用多副本部署（至少2个实例）
+- 配置负载均衡器（Nginx/HAProxy）
+- 使用外部化配置（Nacos集群）
+
+### 7.5 运维命令
+
+```bash
+# 构建并启动
+make docker-build && make docker-up
+
+# 查看状态
+make docker-status
+
+# 查看日志
+make docker-logs-gateway
+
+# 停止服务
+make docker-down
+
+# 清理资源
+make docker-clean
+
+# 进入容器调试
+make docker-shell
+```
+
+### 7.6 Makefile 支持
+
+创建 `Makefile` 简化操作：
+
+```makefile
+.PHONY: docker-build docker-up docker-down docker-logs help
+
+APP_NAME=iot-gateway
+COMPOSE_FILE=docker-compose.yml
+
+help:
+	@echo "Available commands:"
+	@echo "  make docker-build    - Build Docker image"
+	@echo "  make docker-up       - Start services"
+	@echo "  make docker-down     - Stop services"
+	@echo "  make docker-logs     - Show logs"
+
+# 其他Makefile内容详见项目根目录Makefile
+```
 
 ## 8. API 示例
 ### 8.1 设备数据上报
@@ -179,15 +369,6 @@ Host: gateway-host:8080
 - **增强配置手册**: [ENHANCED_CONFIG_GUIDE.md](./ENHANCED_CONFIG_GUIDE.md) - 详细的技术配置指南，包括架构、配置、部署、运维等内容
 - **路由与安全配置指南**: [ROUTING_AND_SECURITY_CONFIG_GUIDE.md](./ROUTING_AND_SECURITY_CONFIG_GUIDE.md) - 详尽的路由配置和安全配置说明
 - **完整文档**: [FULL_DOCUMENTATION.md](./FULL_DOCUMENTATION.md) - 项目的完整介绍和使用手册
-
-## 14. 版本特性 (v2.0.0)
-
-- ✨ **解决配置绑定BUG**: 使用Nacos原生API绕过Spring Cloud Alibaba 2025.0.0.0的@RefreshScope + @ConfigurationProperties BUG
-- ✨ **增强配置热更新**: GatewayConfigHolder提供线程安全的配置管理
-- ✨ **改进路由机制**: Router支持动态配置热更新
-- ✨ **优化过滤器链**: 支持配置热更新的过滤器执行
-- 🐛 **修复路由状态同步**: 确保路由requireAuth配置实时生效
-
 ---
 
 以上内容为 IoT Gateway 的完整配置与使用手册，适用于开发、测试、生产环境快速上手与运维。
